@@ -71,3 +71,10 @@ TotalMinutes      : 9.54501877333333
 The image above has no depth of field, I thought it looked better. here's the one with blur:
 
 ![Same image as bove with depth of field, except a slightly different scene because it is randomly generated](/weekend_final.png)
+
+## Other pretty renders
+
+![](/moons.png)
+
+This one is based on [this](https://github.com/POMMI3R/dasom-rs/tree/master/examples/small_balls):
+![](/pastel.png)

@@ -1,0 +1,21 @@
+[package]
+name = "rtweekend"
+version = "0.1.0"
+authors = ["Nick <abramlujan@gmail.com>"]
+edition = "2018"
+
+[features]
+default = ["dyn_mat", "dyn_hit"]
+wincrypt_rand = []
+dyn_mat = []
+dyn_hit = []
+parallel = ["rayon"]
+
+[dependencies]
+rayon = { version = "1.5", optional = true }
+
+[profile.release]
+codegen-units = 1
+
+[profile.dev]
+codegen-units = 1

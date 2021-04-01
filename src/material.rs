@@ -112,7 +112,7 @@ impl Material for Metal {
         attenuation: &mut Vec3,
         scatter_ray: &mut Ray,
     ) -> bool {
-        let reflected = incoming_ray.dir.unit_vector().reflect(&hit_record.normal);
+        let reflected = incoming_ray.dir.unit_vector().reflect(hit_record.normal);
 
         *scatter_ray = Ray {
             orig: hit_record.p,
@@ -120,7 +120,7 @@ impl Material for Metal {
         };
         *attenuation = self.albedo;
 
-        scatter_ray.dir.dot(&hit_record.normal) > 0.0
+        scatter_ray.dir.dot(hit_record.normal) > 0.0
     }
 }
 #[derive(Clone)]
@@ -159,13 +159,13 @@ impl Material for Dielectric {
 
         let unit_dir = incoming_ray.dir.unit_vector();
 
-        let cos_theta = (-unit_dir).dot(&hit_record.normal).min(1.0);
+        let cos_theta = (-unit_dir).dot(hit_record.normal).min(1.0);
         let sin_theta = (1.0 - cos_theta.powi(2)).sqrt();
 
         let cannot_refract = refraction_ratio * sin_theta > 1.0;
         let dir =
             if cannot_refract || reflectance(cos_theta, refraction_ratio) > rand.random_double() {
-                unit_dir.reflect(&hit_record.normal)
+                unit_dir.reflect(hit_record.normal)
             } else {
                 Vec3::refract(unit_dir, hit_record.normal, refraction_ratio)
             };

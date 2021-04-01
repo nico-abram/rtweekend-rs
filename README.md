@@ -7,7 +7,7 @@ An implementation of [RayTracingInOneWeekend](https://raytracing.github.io/books
 The canonical C++ implementation can be found [here](https://github.com/RayTracing/raytracing.github.io/tree/master/src/InOneWeekend)
 
 To build this, you need [cargo](https://github.com/rust-lang/cargo), the rust package manager, and the recommended way to install it is via [rustup](https://rustup.rs/), the rust toolchain installer.
-Note that this crate only optionally depends on the [rayon]() library for parallel iterators, and otherwise has no depencies (Other than the rust std lib, and either libc for rand() or BCryptGenRandom from the windows api)
+Note that this crate only optionally depends on the [rayon](https://github.com/rayon-rs/rayon) library for parallel iterators, and otherwise has no depencies (Other than the rust std lib, and either libc for rand() or BCryptGenRandom from the windows api)
 
 ## Features
 
@@ -15,8 +15,8 @@ The crate includes a few features (Compile time flags):
 
 - parallel: Parallelize scanlines using rayon. Uses a thread local RNG state
 - dyn_hit: Use trait objects (Dynamic dispatch/vtables) for hittables. This is what the book does, but since we only use spheres, disabling this replaces dyn Hittable's with Sphere's
-- dyn_mat: USe trait objects (Dynamic dispatch/vtables) for materials. Without this feature, an enum (Essentially a tagged union) is used
-- wincrypt_rand: Use the [BCryptGenRandom] windows API instead of libc rand(). This is what I initially used (I wanted to avoid pulling in a dependency for the RNG), before I realized I could just use libc rand.
+- dyn_mat: Use trait objects (Dynamic dispatch/vtables) for materials. Without this feature, an enum (Essentially a tagged union) is used
+- wincrypt_rand: Use the [BCryptGenRandom](https://docs.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom) windows API instead of libc rand(). This is what I initially used (I wanted to avoid pulling in a dependency for the RNG), before I realized I could just use libc rand.
 
 By default only dyn_hit and dyn_mat are enabled, to be as close as possible to the canonical C++ implementation. In my tests, using the parallel and wincrypt_rand features (With no trait objects) was the fastest. You can run with those features executing the following:
 
@@ -68,7 +68,7 @@ TotalMinutes      : 9.54501877333333
 
 ## Final image with blur
 
-The image above has no depth of field, I thought it looked better. here's the one with blur:
+The image above has no depth of field, I thought it looked better. Here's the one with blur:
 
 ![Same image as bove with depth of field, except a slightly different scene because it is randomly generated](/weekend_final.png)
 

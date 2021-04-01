@@ -1,4 +1,5 @@
-mod material;
+pub mod material;
+pub mod scenes;
 mod vec3;
 
 #[cfg(not(all(feature = "wincrypt_rand", target_os = "windows")))]
@@ -12,8 +13,7 @@ pub use libc_rand::RandState;
 pub use win32_rand::RandState;
 
 use material::{Dielectric, LambertianDiffuse, MaterialType, Metal};
-use std::rc::Rc;
-use vec3::Vec3;
+pub use vec3::Vec3;
 
 pub struct Ray {
     pub orig: Vec3,
@@ -43,10 +43,10 @@ pub struct HitRecord {
     material: MaterialType,
 }
 impl HitRecord {
-    fn set_face_normal(&mut self, r: &Ray, outward_normal: &Vec3) {
+    fn set_face_normal(&mut self, r: &Ray, outward_normal: Vec3) {
         self.front_face = r.dir.dot(outward_normal) < 0.0;
         self.normal = if self.front_face {
-            *outward_normal
+            outward_normal
         } else {
             -outward_normal
         };
@@ -75,7 +75,7 @@ impl Hittable for Sphere {
     fn hit(&self, ray: &Ray, t_min: f64, t_max: f64, out: &mut HitRecord) -> bool {
         let ray_to_sphere = ray.orig - self.center;
         let a = ray.dir.length_squared();
-        let half_b = ray.dir.dot(&ray_to_sphere);
+        let half_b = ray.dir.dot(ray_to_sphere);
         let c = ray_to_sphere.length_squared() - self.radius.powi(2);
         let discriminant = half_b.powi(2) - a * c;
         if discriminant < 0.0 {
@@ -93,23 +93,22 @@ impl Hittable for Sphere {
         out.t = root;
         out.p = ray.at(out.t);
         let outward_normal = (out.p - self.center) / self.radius;
-        out.set_face_normal(ray, &outward_normal);
+        out.set_face_normal(ray, outward_normal);
         out.material = self.material.clone();
         true
     }
 }
 #[cfg(feature = "dyn_hit")]
-struct HittableList(Vec<Rc<dyn Hittable>>);
+pub struct HittableList(Vec<std::rc::Rc<dyn Hittable>>);
 #[cfg(not(feature = "dyn_hit"))]
-struct HittableList(Vec<Sphere>);
+pub struct HittableList(Vec<Sphere>);
 impl HittableList {
-    #[allow(dead_code)]
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.0.clear();
     }
     #[cfg(feature = "dyn_hit")]
     fn add<T: Hittable + 'static>(&mut self, object: T) {
-        self.0.push(Rc::new(object));
+        self.0.push(std::rc::Rc::new(object));
     }
     #[cfg(not(feature = "dyn_hit"))]
     fn add(&mut self, object: Sphere) {
@@ -181,7 +180,7 @@ fn output_color(output_px: &mut [u8], pixel: Vec3, samples_per_px: u32) {
     output_px[2] = b;
 }
 
-struct Camera {
+pub struct Camera {
     origin: Vec3,
     lower_left_corner: Vec3,
     horizontal: Vec3,
@@ -189,10 +188,10 @@ struct Camera {
     lens_radius: f64,
     u: Vec3,
     v: Vec3,
-    w: Vec3,
+    _w: Vec3,
 }
 impl Camera {
-    fn new(
+    pub fn new(
         lookfrom: Vec3,
         lookat: Vec3,
         view_up: Vec3,
@@ -207,8 +206,8 @@ impl Camera {
         let viewport_width = viewport_height * aspect_ratio;
 
         let w = (lookfrom - lookat).unit_vector();
-        let u = view_up.cross(&w).unit_vector();
-        let v = w.cross(&u);
+        let u = view_up.cross(w).unit_vector();
+        let v = w.cross(u);
 
         let origin = lookfrom;
         let horizontal = focus_dist * viewport_width * u;
@@ -221,7 +220,7 @@ impl Camera {
             lens_radius: aperture / 2.0,
             u,
             v,
-            w,
+            _w: w,
         }
     }
 
@@ -237,451 +236,43 @@ impl Camera {
     }
 }
 
-#[allow(dead_code)]
-fn random_scene(rand: &mut RandState) -> HittableList {
-    let mut world = HittableList(Vec::with_capacity(22 * 22 + 5));
-
-    let ground_material = LambertianDiffuse::new(Vec3::new(0.5, 0.5, 0.5));
-    world.add(Sphere {
-        center: Vec3::new(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        material: ground_material,
-    });
-
-    for a in -11..11 {
-        for b in -11..11 {
-            let a = a as f64;
-            let b = b as f64;
-            let choose_mat = rand.random_double();
-            let center = Vec3::new(
-                a + 0.9 * rand.random_double(),
-                0.2,
-                b + 0.9 * rand.random_double(),
-            );
-            if choose_mat < 0.8 {
-                // diffuse
-                let albedo = Vec3::random(rand) * Vec3::random(rand);
-                let material = LambertianDiffuse::new(albedo);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else if choose_mat < 0.95 {
-                // metal
-                let material = Metal::new(
-                    rand.random_double_range(0.5, 1.0),
-                    rand.random_double_range(0.5, 1.0),
-                    rand.random_double_range(0.5, 1.0),
-                    rand.random_double_range(0.0, 0.5),
-                );
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else {
-                // glass
-                let material = Dielectric::new(1.5);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            }
-        }
-    }
-    let material1 = Dielectric::new(1.5);
-    world.add(Sphere {
-        center: Vec3::new(0.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material1,
-    });
-    let material2 = LambertianDiffuse::new(Vec3::new(0.4, 0.2, 0.1));
-    world.add(Sphere {
-        center: Vec3::new(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material2,
-    });
-    let material3 = Metal::new(0.7, 0.6, 0.5, 0.0);
-    world.add(Sphere {
-        center: Vec3::new(4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material3,
-    });
-
-    world
+pub struct RenderParams {
+    pub image_width: i64,
+    pub image_height: i64,
+    pub samples_per_px: u32,
+    pub max_depth: i32,
 }
-#[allow(dead_code)]
-fn pastel_scene(rand: &mut RandState) -> HittableList {
-    let mut world = HittableList(Vec::with_capacity(22 * 22 + 5));
+pub fn render(
+    camera: Camera,
+    world: HittableList,
+    params: RenderParams,
+    rand: &mut RandState,
+) -> Vec<u8> {
+    let RenderParams {
+        image_width,
+        image_height,
+        samples_per_px,
+        max_depth,
+    } = params;
 
-    let ground_material = LambertianDiffuse::new(Vec3::new(0.95, 0.95, 0.8));
-    world.add(Sphere {
-        center: Vec3::new(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        material: ground_material,
-    });
+    let mut output = vec![0u8; 3 * (image_width * image_height) as usize];
 
-    for a in -11..11 {
-        for b in -11..11 {
-            let a = a as f64;
-            let b = b as f64;
-            let choose_mat = rand.random_double();
-            let center = Vec3::new(
-                a + 0.9 * rand.random_double(),
-                0.2,
-                b + 0.9 * rand.random_double(),
-            );
-            if choose_mat < 0.8 {
-                // diffuse
-                let albedo = Vec3::new(
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.9, 1.0));
-                let material = LambertianDiffuse::new(albedo);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else if choose_mat < 0.95 {
-                // metal
-                let material = Metal::new(
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.0, 0.5),
-                );
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else {
-                // glass
-                let material = Dielectric::new(1.5);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            }
-        }
-    }
-    let material1 = Dielectric::new(1.5);
-    world.add(Sphere {
-        center: Vec3::new(0.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material1,
-    });
-    let material2 = LambertianDiffuse::new(Vec3::new(1.0, 0.9, 0.8));
-    world.add(Sphere {
-        center: Vec3::new(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material2,
-    });
-    let material3 = Metal::new(0.6, 0.7, 0.8, 0.0);
-    world.add(Sphere {
-        center: Vec3::new(4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material3,
-    });
+    #[cfg(not(feature = "parallel"))]
+    let stderr = &mut std::io::stderr();
 
-    world
-}
-
-#[allow(dead_code)]
-fn moon_scene(rand: &mut RandState) -> HittableList {
-    let mut world = HittableList(Vec::with_capacity(22 * 22 + 5));
-
-    let ground_material = LambertianDiffuse::new(Vec3::new(0.95, 0.95, 0.8));
-    world.add(Sphere {
-        center: Vec3::new(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        material: ground_material,
-    });
-
-    for a in -11..11 {
-        for b in -11..11 {
-            let a = a as f64;
-            let b = b as f64;
-            let choose_mat = rand.random_double();
-            let center = Vec3::new(
-                a + 0.9 * rand.random_double(),
-                0.2,
-                b + 0.9 * rand.random_double(),
-            );
-            if choose_mat < 0.8 {
-                // diffuse
-                let albedo = Vec3::new(
-                    rand.random_double() as u8 as f64,
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double() as u8 as f64,);
-                let material = LambertianDiffuse::new(albedo);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else if choose_mat < 0.95 {
-                // metal
-                let material = Metal::new(
-                    rand.random_double() as u8 as f64,
-                    rand.random_double() as u8 as f64,
-                    rand.random_double_range(0.9, 1.0),
-                    rand.random_double_range(0.0, 0.5),
-                );
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else {
-                // glass
-                let material = Dielectric::new(1.5);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            }
-        }
-    }
-    let material1 = Dielectric::new(1.5);
-    world.add(Sphere {
-        center: Vec3::new(0.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material1,
-    });
-    let material2 = LambertianDiffuse::new(Vec3::new(1.0, 0.9, 0.8));
-    world.add(Sphere {
-        center: Vec3::new(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material2,
-    });
-    let material3 = Metal::new(0.6, 0.7, 0.8, 0.0);
-    world.add(Sphere {
-        center: Vec3::new(4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material3,
-    });
-    let moon1_material = LambertianDiffuse::new(Vec3::new(0.4, 0.0, 0.0));
-    world.add(Sphere {
-        center: Vec3::new(1000.0,1000.0 , -1700.0),
-        radius: 700.0,
-        material: moon1_material,
-    });
-    let moon2_material = LambertianDiffuse::new(Vec3::new(0.0, 0.3, 0.0));
-    world.add(Sphere {
-        center: Vec3::new(1000.0,0.0 , 0.0),
-        radius: 700.0,
-        material: moon2_material,
-    });
-    let moon3_material = LambertianDiffuse::new(Vec3::new(0.0, 0.0, 0.5));
-    world.add(Sphere {
-        center: Vec3::new(1000.0,1300.0 , 2000.0),
-        radius: 700.0,
-        material: moon3_material,
-    });
-    let moon_front_material = LambertianDiffuse::new(Vec3::new(0.1, 0.2, 0.3));
-    world.add(Sphere {
-        center: Vec3::new(-1000.0,0.0 , 0.0),
-        radius: 700.0,
-        material: moon_front_material,
-    });
-
-    world
-}
-#[allow(dead_code)]
-fn red_blue_scene() -> HittableList {
-    let mut world = HittableList(vec![]);
-
-    let radius = (std::f64::consts::PI / 4.0).cos();
-    let material_right = LambertianDiffuse::new(Vec3::new(0.0, 0.0, 1.0));
-    let material_left = LambertianDiffuse::new(Vec3::new(1.0, 0.0, 0.0));
-    world.add(Sphere {
-        center: Vec3::new(-radius, 0.0, -1.0),
-        radius: radius,
-        material: material_left,
-    });
-    world.add(Sphere {
-        center: Vec3::new(radius, 0.0, -1.0),
-        radius: radius,
-        material: material_right,
-    });
-
-    world
-}
-#[allow(dead_code)]
-fn normal_scene() -> HittableList {
-    let mut world = HittableList(vec![]);
-
-    let material_ground = LambertianDiffuse::new(Vec3::new(0.8, 0.8, 0.0));
-    let material_center = LambertianDiffuse::new(Vec3::new(0.1, 0.2, 0.5));
-    let material_left = Metal::new(0.8, 0.8, 0.8, 0.3);
-    let material_right = Metal::new(0.8, 0.6, 0.2, 0.0);
-
-    let material_left = Dielectric::new(1.5);
-    world.add(Sphere {
-        center: Vec3::new(0.0, -100.5, -1.0),
-        radius: 100.0,
-        material: material_ground,
-    });
-    world.add(Sphere {
-        center: Vec3::new(0.0, 0.0, -1.0),
-        radius: 0.5,
-        material: material_center,
-    });
-    world.add(Sphere {
-        center: Vec3::new(-1.0, 0.0, -1.0),
-        radius: 0.5,
-        material: material_left.clone(),
-    });
-    world.add(Sphere {
-        center: Vec3::new(-1.0, 0.0, -1.0),
-        radius: -0.4,
-        material: material_left,
-    });
-    world.add(Sphere {
-        center: Vec3::new(1.0, 0.0, -1.0),
-        radius: 0.5,
-        material: material_right,
-    });
-
-    world
-}
-fn perf_scene() -> HittableList {
-    let mut world = HittableList(Vec::with_capacity(22 * 22 + 5));
-
-    let ground_material = LambertianDiffuse::new(Vec3::new(0.5, 0.5, 0.5));
-    world.add(Sphere {
-        center: Vec3::new(0.0, -1000.0, 0.0),
-        radius: 1000.0,
-        material: ground_material,
-    });
-
-    let mut gen_double = {
-        let mut tmp1 = 0;
-        let mut tmp2 = 0;
-        let mut tmp3 = 0;
-        move || {
-            tmp1 += 1;
-            tmp2 += 3;
-            tmp3 += 7;
-            tmp1 = tmp1 % 100;
-            tmp2 = tmp2 % 100;
-            tmp3 = tmp3 % 100;
-            ((tmp1 as f64) + (tmp2 as f64) + (tmp3 as f64)) / 300.0
-        }
-    };
-    for a in -11..11 {
-        for b in -11..11 {
-            let a = a as f64;
-            let b = b as f64;
-            let choose_mat = gen_double();
-            let center = Vec3::new(a + 0.9 * gen_double(), 0.2, b + 0.9 * gen_double());
-            if choose_mat < 0.8 {
-                // diffuse
-                let albedo = Vec3::new(gen_double(), gen_double(), gen_double())
-                    * Vec3::new(gen_double(), gen_double(), gen_double());
-                let material = LambertianDiffuse::new(albedo);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else if choose_mat < 0.95 {
-                // metal
-                let material = Metal::new(
-                    0.5 + 0.5 * gen_double(),
-                    0.5 + 0.5 * gen_double(),
-                    0.5 + 0.5 * gen_double(),
-                    0.5 * gen_double(),
-                );
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            } else {
-                // glass
-                let material = Dielectric::new(1.5);
-                world.add(Sphere {
-                    center,
-                    radius: 0.2,
-                    material,
-                });
-            }
-        }
-    }
-    let material1 = Dielectric::new(1.5);
-    world.add(Sphere {
-        center: Vec3::new(0.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material1,
-    });
-    let material2 = LambertianDiffuse::new(Vec3::new(0.4, 0.2, 0.1));
-    world.add(Sphere {
-        center: Vec3::new(-4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material2,
-    });
-    let material3 = Metal::new(0.7, 0.6, 0.5, 0.0);
-    world.add(Sphere {
-        center: Vec3::new(4.0, 1.0, 0.0),
-        radius: 1.0,
-        material: material3,
-    });
-
-    world
-}
-fn main() {
-    let mut rand = RandState::new();
-
-    // Image
-    let aspect_ratio = 3.0 / 2.0;
-    let image_width = 1200i64;
-    let image_height = (image_width as f64 / aspect_ratio) as i64;
-    let samples_per_px = 200;
-    let max_depth = 50;
-
-    // World
-    //let world = normal_scene(&mut rand);
-    //let world = red_blue_scene(&mut rand);
-    //let world = moon_scene(&mut rand);
-    //let world = random_scene(&mut rand);
-    let world = pastel_scene(&mut rand);
-    //let world = perf_scene();
-
-    // Camera
-
-    let lookfrom = Vec3::new(13.0, 2.0, 3.0);
-    let lookat = Vec3::new(0.0, 0.0, 0.0);
-    let dist_to_focus = 1.0;
-    let camera = Camera::new(
-        lookfrom,
-        lookat,
-        Vec3::new(0.0, 1.0, 0.0),
-        20.0,
-        aspect_ratio,
-        0.0,
-        dist_to_focus,
-    );
-
-    // Render
-    println!("P3\n{} {}\n255", image_width, image_height);
-
-    let mut output = vec![0u8; 3* (image_width*image_height) as usize];
-
-    let scanline_iter = (0..image_height).rev().zip(output.chunks_mut(3*image_width as usize));
+    let scanline_iter = (0..image_height)
+        .rev()
+        .zip(output.chunks_mut(3 * image_width as usize));
     #[cfg(feature = "parallel")]
     use rayon::prelude::*;
     #[cfg(feature = "parallel")]
     let scanline_iter = scanline_iter.collect::<Vec<_>>().into_par_iter();
     scanline_iter.for_each(|(i, output_scanline)| {
-        #[cfg(not(feature = "parallel"))]
-        write!(&mut std::io::stderr(), "\rScanlines remaining: {:04}", i).unwrap();
+        #[cfg(not(feature = "parallel"))] 
+        {
+            use std::io::Write;
+            write!(stderr, "\rScanlines remaining: {:04}", i).unwrap();
+        }
 
         let mut work =  |rand: &mut RandState| {
             for (j, output_px) in (0..image_width).zip(output_scanline.chunks_mut(3)) {
@@ -701,15 +292,65 @@ fn main() {
         };
         
         #[cfg(feature = "parallel")]
-        thread_local!(static RAND: std::cell::RefCell<RandState> = std::cell::RefCell::new(RandState::new()));
-         RAND.with(|rand| {
-            let mut rand = rand.borrow_mut();
-            work(&mut*rand);
-        });
+        {
+            thread_local!(static RAND: std::cell::RefCell<RandState> = std::cell::RefCell::new(RandState::new()));
+            RAND.with(|rand| {
+                let mut rand = rand.borrow_mut();
+                work(&mut*rand);
+            });
+        }
 
         #[cfg(not(feature = "parallel"))]
-        work(&mut rand);
+        work(rand);
     });
+
+    output
+}
+#[allow(dead_code)]
+fn main() {
+    let mut rand = RandState::new();
+
+    // Image
+    let aspect_ratio = 3.0 / 2.0;
+    let image_width = 1200i64;
+    let image_height = (image_width as f64 / aspect_ratio) as i64;
+    let samples_per_px = 200;
+    let max_depth = 50;
+
+    let render_params = RenderParams {
+        image_width,
+        image_height,
+        samples_per_px,
+        max_depth,
+    };
+
+    // World
+    //let world = scenes::normal_scene(&mut rand);
+    //let world = scenes::red_blue_scene(&mut rand);
+    //let world = scenes::moon_scene(&mut rand);
+    let world = scenes::random_scene(&mut rand);
+    //let world = scenes::pastel_scene(&mut rand);
+    //let world = scenes::perf_scene();
+
+    // Camera
+
+    let lookfrom = Vec3::new(13.0, 2.0, 3.0);
+    let lookat = Vec3::new(0.0, 0.0, 0.0);
+    let dist_to_focus = 1.0;
+    let camera = Camera::new(
+        lookfrom,
+        lookat,
+        Vec3::new(0.0, 1.0, 0.0),
+        20.0,
+        aspect_ratio,
+        0.0,
+        dist_to_focus,
+    );
+
+    // Render
+    println!("P3\n{} {}\n255", image_width, image_height);
+
+    let output = render(camera, world, render_params, &mut rand);
 
     let stdout = std::io::stdout();
     let lock = stdout.lock();

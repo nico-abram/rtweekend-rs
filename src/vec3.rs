@@ -34,12 +34,12 @@ impl Vec3 {
     pub fn sum(&self) -> f64 {
         self.0.iter().sum()
     }
-    pub fn dot(&self, other: &Vec3) -> f64 {
-        (self * other).sum()
+    pub fn dot(&self, other: Vec3) -> f64 {
+        (*self * other).sum()
     }
-    pub fn cross(&self, other: &Vec3) -> Vec3 {
-        let a = &self.0;
-        let b = &other.0;
+    pub fn cross(&self, other: Vec3) -> Vec3 {
+        let a = self.0;
+        let b = other.0;
         Vec3([
             a[1] * b[2] - a[2] * b[1],
             a[2] * b[0] - a[0] * b[2],
@@ -47,7 +47,7 @@ impl Vec3 {
         ])
     }
     pub fn unit_vector(&self) -> Vec3 {
-        self / self.length()
+        *self / self.length()
     }
     pub fn length_squared(&self) -> f64 {
         self.0.iter().map(|x| x.powi(2)).sum()
@@ -93,11 +93,11 @@ impl Vec3 {
         let delta = 1e-8;
         self.0.iter().all(|d| d.abs() < delta)
     }
-    pub fn reflect(&self, normal: &Vec3) -> Vec3 {
-        self - &(2.0 * self.dot(normal) * normal)
+    pub fn reflect(&self, normal: Vec3) -> Vec3 {
+        *self - (2.0 * self.dot(normal) * normal)
     }
     pub fn refract(uv: Vec3, normal: Vec3, etai_over_etat: f64) -> Vec3 {
-        let cos_theta = (-uv).dot(&normal).min(1.0);
+        let cos_theta = (-uv).dot(normal).min(1.0);
         let r_out_perp = etai_over_etat * (uv + cos_theta * normal);
         let x = 1.0 - r_out_perp.length_squared();
         let x = -x.abs().sqrt();
@@ -106,7 +106,7 @@ impl Vec3 {
     }
 }
 
-impl std::ops::Neg for &Vec3 {
+impl std::ops::Neg for Vec3 {
     type Output = Vec3;
 
     #[inline(always)]
@@ -114,16 +114,8 @@ impl std::ops::Neg for &Vec3 {
         Vec3([-self.x(), -self.y(), -self.z()])
     }
 }
-impl std::ops::Neg for Vec3 {
-    type Output = Vec3;
 
-    #[inline(always)]
-    fn neg(self) -> Self::Output {
-        -(&self)
-    }
-}
-
-impl std::ops::Add for &Vec3 {
+impl std::ops::Add for Vec3 {
     type Output = Vec3;
 
     #[inline(always)]
@@ -135,28 +127,14 @@ impl std::ops::Add for &Vec3 {
         ])
     }
 }
-impl std::ops::AddAssign<&Vec3> for Vec3 {
+impl std::ops::AddAssign<Vec3> for Vec3 {
     #[inline(always)]
-    fn add_assign(&mut self, rhs: &Vec3) {
-        let tmp = &*self + rhs;
+    fn add_assign(&mut self, rhs: Vec3) {
+        let tmp = *self + rhs;
         *self = tmp;
     }
 }
-impl std::ops::AddAssign for Vec3 {
-    #[inline(always)]
-    fn add_assign(&mut self, rhs: Vec3) {
-        *self += &rhs;
-    }
-}
-impl std::ops::Add for Vec3 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn add(self, other: Self) -> Vec3 {
-        &self + &other
-    }
-}
-impl std::ops::Sub for &Vec3 {
+impl std::ops::Sub for Vec3 {
     type Output = Vec3;
 
     #[inline(always)]
@@ -168,15 +146,7 @@ impl std::ops::Sub for &Vec3 {
         ])
     }
 }
-impl std::ops::Sub for Vec3 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn sub(self, other: Self) -> Vec3 {
-        &self - &other
-    }
-}
-impl std::ops::Mul<f64> for &Vec3 {
+impl std::ops::Mul<f64> for Vec3 {
     type Output = Vec3;
 
     #[inline(always)]
@@ -184,36 +154,12 @@ impl std::ops::Mul<f64> for &Vec3 {
         Vec3([self.x() * rhs, self.y() * rhs, self.z() * rhs])
     }
 }
-impl std::ops::Mul<f64> for Vec3 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn mul(self, rhs: f64) -> Vec3 {
-        &self * rhs
-    }
-}
-impl std::ops::Mul<&Vec3> for f64 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn mul(self, rhs: &Vec3) -> Vec3 {
-        rhs * self
-    }
-}
 impl std::ops::Mul<Vec3> for f64 {
     type Output = Vec3;
 
     #[inline(always)]
     fn mul(self, rhs: Vec3) -> Vec3 {
-        &rhs * self
-    }
-}
-impl std::ops::Div<f64> for &Vec3 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn div(self, rhs: f64) -> Self::Output {
-        Vec3([self.x() / rhs, self.y() / rhs, self.z() / rhs])
+        rhs * self
     }
 }
 impl std::ops::Div<f64> for Vec3 {
@@ -221,15 +167,7 @@ impl std::ops::Div<f64> for Vec3 {
 
     #[inline(always)]
     fn div(self, rhs: f64) -> Self::Output {
-        &self / rhs
-    }
-}
-impl std::ops::Mul for &Vec3 {
-    type Output = Vec3;
-
-    #[inline(always)]
-    fn mul(self, rhs: &Vec3) -> Vec3 {
-        Vec3([self.x() * rhs.x(), self.y() * rhs.y(), self.z() * rhs.z()])
+        Vec3([self.x() / rhs, self.y() / rhs, self.z() / rhs])
     }
 }
 impl std::ops::Mul for Vec3 {
@@ -237,6 +175,6 @@ impl std::ops::Mul for Vec3 {
 
     #[inline(always)]
     fn mul(self, rhs: Vec3) -> Vec3 {
-        &self * &rhs
+        Vec3([self.x() * rhs.x(), self.y() * rhs.y(), self.z() * rhs.z()])
     }
 }

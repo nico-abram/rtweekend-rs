@@ -268,13 +268,13 @@ pub fn render(
     #[cfg(feature = "parallel")]
     let scanline_iter = scanline_iter.collect::<Vec<_>>().into_par_iter();
     scanline_iter.for_each(|(i, output_scanline)| {
-        #[cfg(not(feature = "parallel"))] 
+        #[cfg(not(feature = "parallel"))]
         {
             use std::io::Write;
             write!(stderr, "\rScanlines remaining: {:04}", i).unwrap();
         }
 
-        let mut work =  |rand: &mut RandState| {
+        let mut work = |rand: &mut RandState| {
             for (j, output_px) in (0..image_width).zip(output_scanline.chunks_mut(3)) {
                 let mut color = Vec3::zero();
                 for _ in 0..samples_per_px {
@@ -283,20 +283,23 @@ pub fn render(
                         (i as f64 + rand.random_double()) / (image_height as f64 - 1.0),
                     );
                     //let r = Ray::new(origin, lower_left_corner + u * horizontal + v * vertical);
-                    let r = camera.get_ray( rand, u, v);
+                    let r = camera.get_ray(rand, u, v);
                     color += ray_color(rand, &world, &r, max_depth);
                 }
 
-                output_color(output_px, color, samples_per_px); 
+                output_color(output_px, color, samples_per_px);
             }
         };
-        
+
         #[cfg(feature = "parallel")]
         {
-            thread_local!(static RAND: std::cell::RefCell<RandState> = std::cell::RefCell::new(RandState::new()));
+            thread_local! {
+                static RAND: std::cell::RefCell<RandState> =
+                    std::cell::RefCell::new(RandState::new())
+            };
             RAND.with(|rand| {
                 let mut rand = rand.borrow_mut();
-                work(&mut*rand);
+                work(&mut *rand);
             });
         }
 
